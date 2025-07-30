@@ -21,7 +21,6 @@ import com.meeran.newsanalyzerapi.dto.AnalysisDto.ProblemAnalysis;
 import com.meeran.newsanalyzerapi.dto.Article;
 import com.meeran.newsanalyzerapi.dto.GeminiDto;
 
-
 @Service
 public class AnalysisService {
     private static final Logger logger = LoggerFactory.getLogger(AnalysisService.class);
@@ -168,12 +167,26 @@ public class AnalysisService {
         HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
         String responseBody = restTemplate.postForObject(fullUrl, entity, String.class);
 
+        String jsonText;
         // Parse the response differently based on the provider
         if (baseUrl.contains("openrouter")) {
-            return objectMapper.readTree(responseBody).at("/choices/0/message/content").asText();
+            jsonText = objectMapper.readTree(responseBody).at("/choices/0/message/content").asText();
         } else { // Gemini
-            return objectMapper.readTree(responseBody).at("/candidates/0/content/parts/0/text").asText();
+            jsonText = objectMapper.readTree(responseBody).at("/candidates/0/content/parts/0/text").asText();
         }
+
+        // SANITIZATION :: Trim whitespace and remove potential markdown code blocks
+        String sanitizedJson = jsonText.trim();
+        if (sanitizedJson.startsWith("```json")) {
+            sanitizedJson = sanitizedJson.substring(7);
+            if (sanitizedJson.endsWith("```")) {
+                sanitizedJson = sanitizedJson.substring(0, sanitizedJson.length() - 3);
+            }
+        } else if (sanitizedJson.startsWith("`") && sanitizedJson.endsWith("`")) {
+            sanitizedJson = sanitizedJson.substring(1, sanitizedJson.length() - 1);
+        }
+
+        return sanitizedJson.trim(); // Return the cleaned JSON string
     }
 
 }
