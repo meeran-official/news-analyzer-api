@@ -2,6 +2,7 @@ package com.meeran.newsanalyzerapi.service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,14 +39,14 @@ public class NewsService {
             .queryParam("language", "en")
             .queryParam("pageSize", 20);
 
-        String sanitizedUrl = builder.toUriString();
-        String url = builder.queryParam("apiKey", apiKey).toUriString();
+        URI sanitizedUri = builder.build(true).toUri();
+        URI uri = builder.queryParam("apiKey", apiKey).build(true).toUri();
 
-        logger.info("Fetching news from URL: {}", sanitizedUrl);
+        logger.info("Fetching news from URL: {}", sanitizedUri);
 
 
         try {
-            return restTemplate.getForObject(url, NewsApiResponse.class);
+            return restTemplate.getForObject(uri, NewsApiResponse.class);
         } catch (HttpClientErrorException e) {
             
             // This will catch errors like 401 (unauthorized), 400 (bad request), etc.
