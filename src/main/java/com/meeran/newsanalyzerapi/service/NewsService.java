@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.meeran.newsanalyzerapi.dto.NewsApiResponse;
 
@@ -29,16 +30,18 @@ public class NewsService {
         LocalDate fromDate = toDate.minusDays(7);
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
 
-        String url = NEWS_API_URL
-            + "?q=" + topic
-            + "&from=" + fromDate.format(formatter)
-            + "&to=" + toDate.format(formatter)
-            + "&sortBy=popularity"
-            + "&language=en"
-            + "&pageSize=20" // Fetch up to 20 articles
-            + "&apiKey=" + apiKey;
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(NEWS_API_URL)
+            .queryParam("q", topic)
+            .queryParam("from", fromDate.format(formatter))
+            .queryParam("to", toDate.format(formatter))
+            .queryParam("sortBy", "popularity")
+            .queryParam("language", "en")
+            .queryParam("pageSize", 20);
 
-        logger.info("Fetching news from URL: {}", url);
+        String sanitizedUrl = builder.toUriString();
+        String url = builder.queryParam("apiKey", apiKey).toUriString();
+
+        logger.info("Fetching news from URL: {}", sanitizedUrl);
 
 
         try {
