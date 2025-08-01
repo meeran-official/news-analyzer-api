@@ -17,7 +17,7 @@ import com.meeran.newsanalyzerapi.service.NewsService;
 @RestController
 @RequestMapping("/api/v1/analyze")
 public class AnalysisController {
-    private static final Logger log = LoggerFactory.getLogger(AnalysisService.class);
+    private static final Logger log = LoggerFactory.getLogger(AnalysisController.class);
 
     private final NewsService newsService;
     private final AnalysisService analysisService;
