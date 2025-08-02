@@ -34,23 +34,32 @@ public class AnalysisController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAnalysisByTopic(@RequestParam String topic) {
-        log.info("Received request to analyze topic: {}", topic);
+    public ResponseEntity<?> getAnalysisByTopic(
+            @RequestParam String topic,
+            @RequestParam(defaultValue = "english") String language) {
+        log.info("Received request to analyze topic: {} in language: {}", topic, language);
         if (topic == null || topic.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("{\"error\": \"Topic cannot be empty.\"}");
         }
-        NewsApiResponse newsResponse = newsService.fetchArticlesForTopic(topic);
+        
+        try {
+            NewsApiResponse newsResponse = newsService.fetchArticlesForTopic(topic);
 
-        if (newsResponse != null && !newsResponse.articles().isEmpty()) {
-            ProblemAnalysis analysis = analysisService.analyzeTopic(topic, newsResponse.articles());
+            if (newsResponse != null && !newsResponse.articles().isEmpty()) {
+                ProblemAnalysis analysis = analysisService.analyzeTopic(topic, newsResponse.articles(), language);
 
-            if (analysis != null) {
-                return ResponseEntity.ok(analysis);
+                if (analysis != null) {
+                    return ResponseEntity.ok(analysis);
+                }
             }
+            // Failure: return 500 Internal Server Error with a clear message
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("{\"error\": \"Failed to retrieve or analyze the topic: " + topic + "\"}");
+        } catch (RuntimeException e) {
+            log.error("Analysis failed for topic: {}", topic, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("{\"error\": \"" + e.getMessage() + "\"}");
         }
-        // Failure: return 500 Internal Server Error with a clear message
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("{\"error\": \"Failed to retrieve or analyze the topic: " + topic + "\"}");
     }
 
     @GetMapping("/suggestions")

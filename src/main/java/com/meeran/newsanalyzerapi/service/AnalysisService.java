@@ -59,13 +59,42 @@ public class AnalysisService {
     @Value("${llm.secondary.model.random}")
     private String secondaryRandomModel;
 
+    // Backwards compatibility method
     @Cacheable("analysis")
     public ProblemAnalysis analyzeTopic(String topic, List<Article> articles) {
+        return analyzeTopic(topic, articles, "english");
+    }
+    
+    @Cacheable("analysis")
+    public ProblemAnalysis analyzeTopic(String topic, List<Article> articles, String language) {
         String consolidatedContent = articles.stream()
                 .map(article -> "Title: " + article.title() + "\nDescription: " + article.description())
                 .collect(Collectors.joining("\n\n"));
 
-        String prompt = """
+        boolean isTamil = "tamil".equalsIgnoreCase(language);
+        
+        String prompt = isTamil ? 
+                """
+                ஒரு நடுநிலையான கொள்கை ஆய்வாளராக செயல்படுங்கள். '%s' என்ற தலைப்பில் கடந்த வாரத்தின் செய்தி தலைப்புகள் மற்றும் விளக்கங்களின் அடிப்படையில்,
+                தகவல்களை ஒருங்கிணைத்து சுருக்கமான பகுப்பாய்வை உருவாக்குங்கள்.
+
+                உங்கள் பதில் பின்வரும் schema உடன் கூடிய JSON object மட்டுமே இருக்க வேண்டும்:
+                {
+                  "topic": "தலைப்புக்கான 3-5 சொற்கள் தமிழில்.",
+                  "summary": "முக்கிய நிகழ்வுகள் அல்லது விவாதங்களின் ஒரு பத்தி சுருக்கம் தமிழில்.",
+                  "aggregatedProblem": "இந்த கட்டுரைகளில் இருந்து அடையாளம் காணப்பட்ட மிக முக்கியமான அடிப்படை பிரச்சினை தமிழில்.",
+                  "solutionProposal": "அடிப்படை பிரச்சனைக்கு ஒரு ஆக்கபூர்வமான மற்றும் நம்பகமான தீர்வு தமிழில்.",
+                  "proposingViewpoint": "இந்த செய்தி போக்கை ஆதரிப்பவர்களின் கோணம் அல்லது சாத்தியமான சார்பு தமிழில்.",
+                  "opposingViewpoint": "இந்த போக்கை எதிர்க்கும் அல்லது விமர்சிப்பவர்களின் கோணம் தமிழில்.",
+                  "historicalPerspective": "இந்த பிரச்சினைக்கான சுருக்கமான வரலாற்று இணை அல்லது சூழல் தமிழில்.",
+                  "motivationalProverb": "பிரச்சினை அல்லது தீர்வுடன் தொடர்புடைய ஒரு ஆழமான பழமொழி அல்லது மேற்கோள் தமிழில்."
+                }
+
+                ஒருங்கிணைக்கப்பட்ட செய்தி உள்ளடக்கம்:
+                ---
+                %s
+                """ :
+                """
                 Act as an impartial policy analyst. Based on the following collection of news headlines and descriptions from the past week on the topic of '%s',
                 synthesize the information to produce a concise analysis.
 
@@ -84,15 +113,40 @@ public class AnalysisService {
                 Consolidated News Content:
                 ---
                 %s
-                """
-                .formatted(topic, consolidatedContent);
+                """;
+        
+        prompt = prompt.formatted(topic, consolidatedContent);
 
         try {
             String jsonResponseText = callLlmApi(prompt, primaryApiUrl, primaryAnalysisModel, primaryApiKey,
                     "application/json");
-            return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
-        } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
-            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary (OpenRouter).",
+            try {
+                return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
+            } catch (Exception parseEx) {
+                logger.warn("Primary provider (Gemini) returned unparsable JSON. Attempting secondary provider.");
+                // Try secondary provider immediately
+                try {
+                    String secondaryJson = callLlmApi(prompt, secondaryApiUrl, secondaryAnalysisModel, secondaryApiKey,
+                            "application/json");
+                    return objectMapper.readValue(secondaryJson, ProblemAnalysis.class);
+                } catch (Exception secondaryEx) {
+                    logger.error("Secondary provider also failed to parse JSON.", secondaryEx);
+                    throw new RuntimeException("Both LLM providers returned invalid responses.", secondaryEx);
+                }
+            }
+        } catch (HttpClientErrorException e) {
+            logger.warn("Primary provider (Gemini) failed with status {}: {}. Failing over to secondary (OpenRouter).",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            try {
+                String jsonResponseText = callLlmApi(prompt, secondaryApiUrl, secondaryAnalysisModel, secondaryApiKey,
+                        "application/json");
+                return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
+            } catch (Exception ex) {
+                logger.error("Secondary provider also failed.", ex);
+                throw new RuntimeException("Content analysis unavailable. This topic may be restricted by our AI providers or experiencing high demand. Please try a different topic.", ex);
+            }
+        } catch (HttpServerErrorException e) {
+            logger.warn("Primary provider (Gemini) server error ({}). Failing over to secondary (OpenRouter).",
                     e.getClass().getSimpleName());
             try {
                 String jsonResponseText = callLlmApi(prompt, secondaryApiUrl, secondaryAnalysisModel, secondaryApiKey,
@@ -100,11 +154,11 @@ public class AnalysisService {
                 return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
             } catch (Exception ex) {
                 logger.error("Secondary provider also failed.", ex);
-                throw new RuntimeException("Both LLM providers failed for analysis", ex);
+                throw new RuntimeException("Analysis service temporarily unavailable. Please try again in a few moments.", ex);
             }
         } catch (Exception e) {
             logger.error("Error during LLM analysis", e);
-            throw new RuntimeException("LLM analysis failed", e);
+            throw new RuntimeException("Unable to analyze this topic. Please try a different topic or try again later.", e);
         }
     }
 
