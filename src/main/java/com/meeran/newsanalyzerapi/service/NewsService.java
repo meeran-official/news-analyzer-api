@@ -2,6 +2,7 @@ package com.meeran.newsanalyzerapi.service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.meeran.newsanalyzerapi.dto.NewsApiResponse;
 
@@ -20,8 +22,12 @@ public class NewsService {
     @Value("${news.api.key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private static final String NEWS_API_URL = "https://newsapi.org/v2/everything";
+
+    public NewsService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
     
     public NewsApiResponse fetchArticlesForTopic(String topic) {
         // Get today's date and the date for 7 days ago
@@ -29,20 +35,22 @@ public class NewsService {
         LocalDate fromDate = toDate.minusDays(7);
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
 
-        String url = NEWS_API_URL
-            + "?q=" + topic
-            + "&from=" + fromDate.format(formatter)
-            + "&to=" + toDate.format(formatter)
-            + "&sortBy=popularity"
-            + "&language=en"
-            + "&pageSize=20" // Fetch up to 20 articles
-            + "&apiKey=" + apiKey;
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(NEWS_API_URL)
+            .queryParam("q", topic)
+            .queryParam("from", fromDate.format(formatter))
+            .queryParam("to", toDate.format(formatter))
+            .queryParam("sortBy", "popularity")
+            .queryParam("language", "en")
+            .queryParam("pageSize", 20);
 
-        logger.info("Fetching news from URL: {}", url);
+        URI sanitizedUri = builder.build(true).toUri();
+        URI uri = builder.queryParam("apiKey", apiKey).build(true).toUri();
+
+        logger.info("Fetching news from URL: {}", sanitizedUri);
 
 
         try {
-            return restTemplate.getForObject(url, NewsApiResponse.class);
+            return restTemplate.getForObject(uri, NewsApiResponse.class);
         } catch (HttpClientErrorException e) {
             
             // This will catch errors like 401 (unauthorized), 400 (bad request), etc.
