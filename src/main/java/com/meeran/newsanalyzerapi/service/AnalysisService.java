@@ -59,6 +59,20 @@ public class AnalysisService {
     @Value("${llm.secondary.model.random}")
     private String secondaryRandomModel;
 
+    // --- Third Provider Config ---
+    @Value("${llm.third.provider}")
+    private String thirdProvider;
+    @Value("${llm.third.api.key}")
+    private String thirdApiKey;
+    @Value("${llm.third.api.url}")
+    private String thirdApiUrl;
+    @Value("${llm.third.model.analysis}")
+    private String thirdAnalysisModel;
+    @Value("${llm.third.model.suggestions}")
+    private String thirdSuggestionsModel;
+    @Value("${llm.third.model.random}")    
+    private String thirdRandomModel;
+
     // Backwards compatibility method
     @Cacheable("analysis")
     public ProblemAnalysis analyzeTopic(String topic, List<Article> articles) {
@@ -130,31 +144,53 @@ public class AnalysisService {
                             "application/json");
                     return objectMapper.readValue(secondaryJson, ProblemAnalysis.class);
                 } catch (Exception secondaryEx) {
-                    logger.error("Secondary provider also failed to parse JSON.", secondaryEx);
-                    throw new RuntimeException("Both LLM providers returned invalid responses.", secondaryEx);
+                    logger.warn("Secondary provider also failed to parse JSON. Attempting third provider (OpenRouter).");
+                    // Try third provider
+                    try {
+                        String thirdJson = callLlmApi(prompt, thirdApiUrl, thirdAnalysisModel, thirdApiKey,
+                                "application/json");
+                        return objectMapper.readValue(thirdJson, ProblemAnalysis.class);
+                    } catch (Exception thirdEx) {
+                        logger.error("All three LLM providers failed to parse JSON.", thirdEx);
+                        throw new RuntimeException("All LLM providers returned invalid responses.", thirdEx);
+                    }
                 }
             }
         } catch (HttpClientErrorException e) {
-            logger.warn("Primary provider (Gemini) failed with status {}: {}. Failing over to secondary (OpenRouter).",
+            logger.warn("Primary provider (Gemini) failed with status {}: {}. Failing over to secondary provider.",
                     e.getStatusCode(), e.getResponseBodyAsString());
             try {
                 String jsonResponseText = callLlmApi(prompt, secondaryApiUrl, secondaryAnalysisModel, secondaryApiKey,
                         "application/json");
                 return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
-            } catch (Exception ex) {
-                logger.error("Secondary provider also failed.", ex);
-                throw new RuntimeException("Content analysis unavailable. This topic may be restricted by our AI providers or experiencing high demand. Please try a different topic.", ex);
+            } catch (Exception secondaryEx) {
+                logger.warn("Secondary provider also failed. Failing over to third provider (OpenRouter).");
+                try {
+                    String thirdJson = callLlmApi(prompt, thirdApiUrl, thirdAnalysisModel, thirdApiKey,
+                            "application/json");
+                    return objectMapper.readValue(thirdJson, ProblemAnalysis.class);
+                } catch (Exception thirdEx) {
+                    logger.error("All three providers failed.", thirdEx);
+                    throw new RuntimeException("Content analysis unavailable. This topic may be restricted by our AI providers or experiencing high demand. Please try a different topic.", thirdEx);
+                }
             }
         } catch (HttpServerErrorException e) {
-            logger.warn("Primary provider (Gemini) server error ({}). Failing over to secondary (OpenRouter).",
+            logger.warn("Primary provider (Gemini) server error ({}). Failing over to secondary provider.",
                     e.getClass().getSimpleName());
             try {
                 String jsonResponseText = callLlmApi(prompt, secondaryApiUrl, secondaryAnalysisModel, secondaryApiKey,
                         "application/json");
                 return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
-            } catch (Exception ex) {
-                logger.error("Secondary provider also failed.", ex);
-                throw new RuntimeException("Analysis service temporarily unavailable. Please try again in a few moments.", ex);
+            } catch (Exception secondaryEx) {
+                logger.warn("Secondary provider also failed. Failing over to third provider (OpenRouter).");
+                try {
+                    String thirdJson = callLlmApi(prompt, thirdApiUrl, thirdAnalysisModel, thirdApiKey,
+                            "application/json");
+                    return objectMapper.readValue(thirdJson, ProblemAnalysis.class);
+                } catch (Exception thirdEx) {
+                    logger.error("All three providers failed.", thirdEx);
+                    throw new RuntimeException("Analysis service temporarily unavailable. Please try again in a few moments.", thirdEx);
+                }
             }
         } catch (Exception e) {
             logger.error("Error during LLM analysis", e);
@@ -168,14 +204,20 @@ public class AnalysisService {
         try {
             return callLlmApi(prompt, primaryApiUrl, primarySuggestionsModel, primaryApiKey, "application/json");
         } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
-            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary (OpenRouter).",
+            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary provider.",
                     e.getClass().getSimpleName());
             try {
                 return callLlmApi(prompt, secondaryApiUrl, secondarySuggestionsModel, secondaryApiKey,
                         "application/json");
-            } catch (Exception ex) {
-                logger.error("Secondary provider also failed for suggestions.", ex);
-                return "[]";
+            } catch (Exception secondaryEx) {
+                logger.warn("Secondary provider also failed for suggestions. Failing over to third provider (OpenRouter).");
+                try {
+                    return callLlmApi(prompt, thirdApiUrl, thirdSuggestionsModel, thirdApiKey,
+                            "application/json");
+                } catch (Exception thirdEx) {
+                    logger.error("All three providers failed for suggestions.", thirdEx);
+                    return "[]";
+                }
             }
         } catch (Exception e) {
             logger.error("Error fetching topic suggestions", e);
@@ -189,13 +231,18 @@ public class AnalysisService {
         try {
             return callLlmApi(prompt, primaryApiUrl, primaryRandomModel, primaryApiKey, "text/plain");
         } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
-            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary (OpenRouter).",
+            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary provider.",
                     e.getClass().getSimpleName());
             try {
                 return callLlmApi(prompt, secondaryApiUrl, secondaryRandomModel, secondaryApiKey, "text/plain");
-            } catch (Exception ex) {
-                logger.error("Secondary provider also failed for random topic.", ex);
-                return "Global economic trends";
+            } catch (Exception secondaryEx) {
+                logger.warn("Secondary provider also failed for random topic. Failing over to third provider (OpenRouter).");
+                try {
+                    return callLlmApi(prompt, thirdApiUrl, thirdRandomModel, thirdApiKey, "text/plain");
+                } catch (Exception thirdEx) {
+                    logger.error("All three providers failed for random topic.", thirdEx);
+                    return "Global economic trends";
+                }
             }
         } catch (Exception e) {
             logger.error("Error fetching random topic", e);
@@ -238,7 +285,7 @@ public class AnalysisService {
         while (attempts < 2) {
             try {
                 var response = restTemplate.postForEntity(fullUrl, entity, String.class);
-                logger.info("LLM API response status={} body={}", response.getStatusCodeValue(), response.getBody());
+                logger.info("LLM API response status={} body={}", response.getStatusCode().value(), response.getBody());
 
                 String responseBody = response.getBody();
                 String jsonText;
