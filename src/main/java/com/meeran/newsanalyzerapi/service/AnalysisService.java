@@ -3,6 +3,7 @@ package com.meeran.newsanalyzerapi.service;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,12 +12,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.HttpServerErrorException;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.web.client.ResourceAccessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meeran.newsanalyzerapi.dto.AnalysisDto.ProblemAnalysis;
 import com.meeran.newsanalyzerapi.dto.Article;
@@ -148,16 +149,21 @@ public class AnalysisService {
         }
     }
 
-    private String callLlmApi(String prompt, String baseUrl, String model, String apiKey, String mimeType)
-            throws JsonProcessingException {
+    private String callLlmApi(String prompt, String baseUrl, String model, String apiKey, String mimeType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        // Ensure timeouts for external provider calls
+        var requestFactory = new HttpComponentsClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(5000);
+        requestFactory.setReadTimeout(5000);
+        restTemplate.setRequestFactory(requestFactory);
 
         Object requestBody;
         String fullUrl;
 
-        // Differentiate between Gemini and OpenAI-compatible (OpenRouter) API
-        // structures
+        // Differentiate between Gemini and OpenAI-compatible (OpenRouter) API structures
         if (baseUrl.contains("openrouter")) {
             headers.set("Authorization", "Bearer " + apiKey);
             requestBody = Map.of(
@@ -173,28 +179,45 @@ public class AnalysisService {
         }
 
         HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
-        String responseBody = restTemplate.postForObject(fullUrl, entity, String.class);
 
-        String jsonText;
-        // Parse the response differently based on the provider
-        if (baseUrl.contains("openrouter")) {
-            jsonText = objectMapper.readTree(responseBody).at("/choices/0/message/content").asText();
-        } else { // Gemini
-            jsonText = objectMapper.readTree(responseBody).at("/candidates/0/content/parts/0/text").asText();
-        }
+        int attempts = 0;
+        while (attempts < 2) {
+            try {
+                var response = restTemplate.postForEntity(fullUrl, entity, String.class);
+                logger.info("LLM API response status={} body={}", response.getStatusCodeValue(), response.getBody());
 
-        // SANITIZATION :: Trim whitespace and remove potential markdown code blocks
-        String sanitizedJson = jsonText.trim();
-        if (sanitizedJson.startsWith("```json")) {
-            sanitizedJson = sanitizedJson.substring(7);
-            if (sanitizedJson.endsWith("```")) {
-                sanitizedJson = sanitizedJson.substring(0, sanitizedJson.length() - 3);
+                String responseBody = response.getBody();
+                String jsonText;
+                // Parse the response differently based on the provider
+                if (baseUrl.contains("openrouter")) {
+                    jsonText = objectMapper.readTree(responseBody).at("/choices/0/message/content").asText();
+                } else { // Gemini
+                    jsonText = objectMapper.readTree(responseBody).at("/candidates/0/content/parts/0/text").asText();
+                }
+
+                // SANITIZATION :: Trim whitespace and remove potential markdown code blocks
+                String sanitizedJson = jsonText.trim();
+                if (sanitizedJson.startsWith("```json")) {
+                    sanitizedJson = sanitizedJson.substring(7);
+                    if (sanitizedJson.endsWith("```")) {
+                        sanitizedJson = sanitizedJson.substring(0, sanitizedJson.length() - 3);
+                    }
+                } else if (sanitizedJson.startsWith("`") && sanitizedJson.endsWith("`")) {
+                    sanitizedJson = sanitizedJson.substring(1, sanitizedJson.length() - 1);
+                }
+
+                return sanitizedJson.trim(); // Return the cleaned JSON string
+            } catch (ResourceAccessException e) {
+                attempts++;
+                logger.warn("LLM API request attempt {} failed due to resource access: {}", attempts, e.getMessage());
+            } catch (IOException e) {
+                attempts++;
+                logger.warn("LLM API request attempt {} failed due to IO: {}", attempts, e.getMessage());
             }
-        } else if (sanitizedJson.startsWith("`") && sanitizedJson.endsWith("`")) {
-            sanitizedJson = sanitizedJson.substring(1, sanitizedJson.length() - 1);
         }
 
-        return sanitizedJson.trim(); // Return the cleaned JSON string
+        logger.error("LLM API request failed after {} attempts; returning fallback response", attempts);
+        return "[]";
     }
 
 }
