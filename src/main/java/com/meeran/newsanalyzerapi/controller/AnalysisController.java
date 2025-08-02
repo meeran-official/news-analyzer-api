@@ -1,5 +1,8 @@
 package com.meeran.newsanalyzerapi.controller;
 
+import java.util.Collections;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -8,6 +11,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.meeran.newsanalyzerapi.dto.AnalysisDto.ProblemAnalysis;
 import com.meeran.newsanalyzerapi.dto.NewsApiResponse;
@@ -48,10 +54,17 @@ public class AnalysisController {
     }
 
     @GetMapping("/suggestions")
-    public ResponseEntity<?> getTopicSuggestions() {
-
+    public ResponseEntity<List<String>> getTopicSuggestions() {
         String suggestionsJson = analysisService.getTopicSuggestions();
-        return ResponseEntity.ok(suggestionsJson);
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            List<String> suggestions = mapper.readValue(suggestionsJson, new TypeReference<List<String>>() {
+            });
+            return ResponseEntity.ok(suggestions);
+        } catch (Exception e) {
+            log.error("Failed to parse topic suggestions", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
+        }
     }
 
     @GetMapping("/random-topic")
