@@ -121,7 +121,7 @@ public class AnalysisService {
         }
     }
 
-    @Cacheable("randomTopic")
+    // @Cacheable("randomTopic")
     public String getRandomSingleTopic() {
         String prompt = "Generate a single, interesting, and globally relevant news topic suitable for deep analysis. The topic should be 3-5 words long. Respond ONLY with the topic as a single plain text string, without quotes or any other formatting.";
         try {
