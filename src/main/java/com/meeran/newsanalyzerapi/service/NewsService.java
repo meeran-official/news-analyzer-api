@@ -43,8 +43,8 @@ public class NewsService {
             .queryParam("language", "en")
             .queryParam("pageSize", 20);
 
-        URI sanitizedUri = builder.build(true).toUri();
-        URI uri = builder.queryParam("apiKey", apiKey).build(true).toUri();
+        URI sanitizedUri = builder.cloneBuilder().build().encode().toUri();
+        URI uri = builder.cloneBuilder().queryParam("apiKey", apiKey).build().encode().toUri();
 
         logger.info("Fetching news from URL: {}", sanitizedUri);
 
