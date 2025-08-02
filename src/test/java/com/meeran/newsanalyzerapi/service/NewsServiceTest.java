@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
+import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -24,7 +25,7 @@ class NewsServiceTest {
         NewsService service = new NewsService(restTemplate);
         ReflectionTestUtils.setField(service, "apiKey", "test-key");
 
-        when(restTemplate.getForObject(any(URI.class), eq(NewsApiResponse.class))).thenReturn(new NewsApiResponse());
+        when(restTemplate.getForObject(any(URI.class), eq(NewsApiResponse.class))).thenReturn(new NewsApiResponse("ok", 0, Collections.emptyList()));
 
         service.fetchArticlesForTopic("climate change");
 
@@ -42,7 +43,7 @@ class NewsServiceTest {
         NewsService service = new NewsService(restTemplate);
         ReflectionTestUtils.setField(service, "apiKey", "test-key");
 
-        when(restTemplate.getForObject(any(URI.class), eq(NewsApiResponse.class))).thenReturn(new NewsApiResponse());
+        when(restTemplate.getForObject(any(URI.class), eq(NewsApiResponse.class))).thenReturn(new NewsApiResponse("ok", 0, Collections.emptyList()));
 
         service.fetchArticlesForTopic("c# & kotlin");
 
