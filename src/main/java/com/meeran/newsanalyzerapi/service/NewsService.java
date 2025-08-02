@@ -22,8 +22,12 @@ public class NewsService {
     @Value("${news.api.key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private static final String NEWS_API_URL = "https://newsapi.org/v2/everything";
+
+    public NewsService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
     
     public NewsApiResponse fetchArticlesForTopic(String topic) {
         // Get today's date and the date for 7 days ago

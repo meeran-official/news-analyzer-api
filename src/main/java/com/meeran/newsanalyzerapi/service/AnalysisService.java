@@ -24,8 +24,12 @@ import com.meeran.newsanalyzerapi.dto.GeminiDto;
 @Service
 public class AnalysisService {
     private static final Logger logger = LoggerFactory.getLogger(AnalysisService.class);
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public AnalysisService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     // --- Primary Provider Config ---
     @Value("${llm.primary.api.key}")
