@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpServerErrorException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,19 +90,20 @@ public class AnalysisService {
             String jsonResponseText = callLlmApi(prompt, primaryApiUrl, primaryAnalysisModel, primaryApiKey,
                     "application/json");
             return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            logger.warn("Primary provider (Gemini) rate limited. Failing over to secondary (OpenRouter).");
+        } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
+            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary (OpenRouter).",
+                    e.getClass().getSimpleName());
             try {
                 String jsonResponseText = callLlmApi(prompt, secondaryApiUrl, secondaryAnalysisModel, secondaryApiKey,
                         "application/json");
                 return objectMapper.readValue(jsonResponseText, ProblemAnalysis.class);
             } catch (Exception ex) {
                 logger.error("Secondary provider also failed.", ex);
-                return null;
+                throw new RuntimeException("Both LLM providers failed for analysis", ex);
             }
         } catch (Exception e) {
             logger.error("Error during LLM analysis", e);
-            return null;
+            throw new RuntimeException("LLM analysis failed", e);
         }
     }
 
@@ -110,8 +112,9 @@ public class AnalysisService {
         String prompt = "List 8 current and globally relevant news topics suitable for deep analysis. The topics should be 2-4 words long. Respond ONLY with a valid JSON array of strings. Example: [\"Global AI Regulation\", \"Future of Urban Mobility\"]";
         try {
             return callLlmApi(prompt, primaryApiUrl, primarySuggestionsModel, primaryApiKey, "application/json");
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            logger.warn("Primary provider (Gemini) rate limited. Failing over to secondary (OpenRouter).");
+        } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
+            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary (OpenRouter).",
+                    e.getClass().getSimpleName());
             try {
                 return callLlmApi(prompt, secondaryApiUrl, secondarySuggestionsModel, secondaryApiKey,
                         "application/json");
@@ -130,8 +133,9 @@ public class AnalysisService {
         String prompt = "Generate a single, interesting, and globally relevant news topic suitable for deep analysis. The topic should be 3-5 words long. Respond ONLY with the topic as a single plain text string, without quotes or any other formatting.";
         try {
             return callLlmApi(prompt, primaryApiUrl, primaryRandomModel, primaryApiKey, "text/plain");
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            logger.warn("Primary provider (Gemini) rate limited. Failing over to secondary (OpenRouter).");
+        } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
+            logger.warn("Primary provider (Gemini) unavailable ({}). Failing over to secondary (OpenRouter).",
+                    e.getClass().getSimpleName());
             try {
                 return callLlmApi(prompt, secondaryApiUrl, secondaryRandomModel, secondaryApiKey, "text/plain");
             } catch (Exception ex) {
