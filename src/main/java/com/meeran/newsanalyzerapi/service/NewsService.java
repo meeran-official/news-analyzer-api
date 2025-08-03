@@ -41,16 +41,32 @@ public class NewsService {
 
     @Cacheable("newsArticles")
     public NewsApiResponse fetchArticlesForTopic(String topic) {
+        NewsApiResponse primaryResponse = null;
         try {
             logger.info("Attempting to fetch articles from primary provider (NewsAPI.org)");
-            return fetchFromNewsAPI(topic);
+            primaryResponse = fetchFromNewsAPI(topic);
+
+            // Explicitly check if the primary response has articles.
+            if (primaryResponse != null && primaryResponse.articles() != null
+                    && !primaryResponse.articles().isEmpty()) {
+                logger.info("Successfully fetched {} articles from primary provider.",
+                        primaryResponse.articles().size());
+                return primaryResponse;
+            }
+
+            // If no articles, log it and proceed to fallback.
+            logger.warn("Primary provider returned no articles for topic: {}. Failing over to secondary provider.",
+                    topic);
+
         } catch (HttpClientErrorException.TooManyRequests e) {
-            logger.warn("Primary news provider failed. Failing over to secondary provider (Mediastack).", e);
-            return fetchFromMediastack(topic);
+            logger.warn("Primary news provider rate limited. Failing over to secondary provider (Mediastack).", e);
         } catch (Exception e) {
-            logger.error("Primary news provider failed. Attempting fallback.", e);
-            return fetchFromMediastack(topic);
+            logger.error("Primary news provider failed with an exception. Attempting fallback.", e);
         }
+
+        // Call the secondary provider if the primary one failed or returned no
+        // articles.
+        return fetchFromMediastack(topic);
     }
 
     private NewsApiResponse fetchFromNewsAPI(String topic) {
@@ -69,7 +85,7 @@ public class NewsService {
                 .toUriString();
 
         return restTemplate.getForObject(url, NewsApiResponse.class);
-    }    
+    }
 
     private NewsApiResponse fetchFromMediastack(String topic) {
         String url = UriComponentsBuilder.fromHttpUrl(secondaryApiUrl)
@@ -78,7 +94,7 @@ public class NewsService {
                 .queryParam("languages", "en")
                 .queryParam("limit", 20)
                 .toUriString();
-        
+
         logger.info("Calling Mediastack with URL: {}", url);
 
         try {

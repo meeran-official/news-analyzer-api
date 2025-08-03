@@ -41,20 +41,28 @@ public class AnalysisController {
         if (topic == null || topic.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("{\"error\": \"Topic cannot be empty.\"}");
         }
-        
+
         try {
             NewsApiResponse newsResponse = newsService.fetchArticlesForTopic(topic);
 
-            if (newsResponse != null && !newsResponse.articles().isEmpty()) {
-                ProblemAnalysis analysis = analysisService.analyzeTopic(topic, newsResponse.articles(), language);
-
-                if (analysis != null) {
-                    return ResponseEntity.ok(analysis);
-                }
+            // Handle case where no articles were found
+            if (newsResponse == null || newsResponse.articles().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("{\"error\": \"No recent news articles found for the topic: " + topic
+                                + ". Please try another topic.\"}");
             }
-            // Failure: return 500 Internal Server Error with a clear message
+
+            // Proceed with analysis if articles were found
+            ProblemAnalysis analysis = analysisService.analyzeTopic(topic, newsResponse.articles(), language);
+
+            if (analysis != null) {
+                return ResponseEntity.ok(analysis);
+            }
+
+            // Fallback for analysis failure
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("{\"error\": \"Failed to retrieve or analyze the topic: " + topic + "\"}");
+                    .body("{\"error\": \"Failed to analyze the topic after retrieving articles: " + topic + "\"}");
+
         } catch (RuntimeException e) {
             log.error("Analysis failed for topic: {}", topic, e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

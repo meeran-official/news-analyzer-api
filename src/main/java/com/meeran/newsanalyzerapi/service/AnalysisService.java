@@ -255,12 +255,6 @@ public class AnalysisService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-        // Ensure timeouts for external provider calls
-        var requestFactory = new HttpComponentsClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(5000);
-        requestFactory.setReadTimeout(5000);
-        restTemplate.setRequestFactory(requestFactory);
-
         Object requestBody;
         String fullUrl;
 

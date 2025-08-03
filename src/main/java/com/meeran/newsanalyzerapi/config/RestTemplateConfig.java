@@ -13,8 +13,8 @@ public class RestTemplateConfig {
     @Bean
     public RestTemplate restTemplate() {
         HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(10));
+        factory.setConnectTimeout(Duration.ofSeconds(25));
+        factory.setReadTimeout(Duration.ofSeconds(25));
         return new RestTemplate(factory);
     }
 }
