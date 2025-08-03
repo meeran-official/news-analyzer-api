@@ -2,7 +2,7 @@
 
 <!-- ![Project Demo GIF](URL_TO_YOUR_DEMO_GIF_HERE) -->
 
-<!-- > **Live Demo:** [https://your-live-demo-url.com](https://your-live-demo-url.com) -->
+> **Live Demo:** [news-analyzer](https://news-analyzer-ui.vercel.app/)
 
 > **Backend Repository:** [news-analyzer-api](https://github.com/meeran-official/news-analyzer-api)
 
