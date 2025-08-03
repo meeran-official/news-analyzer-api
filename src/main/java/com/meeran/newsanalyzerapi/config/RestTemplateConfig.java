@@ -1,5 +1,7 @@
 package com.meeran.newsanalyzerapi.config;
 
+import java.time.Duration;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
@@ -10,7 +12,9 @@ public class RestTemplateConfig {
 
     @Bean
     public RestTemplate restTemplate() {
-        // Configure the RestTemplate to use the Apache HttpClient 5 request factory
-        return new RestTemplate(new HttpComponentsClientHttpRequestFactory());
+        HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        return new RestTemplate(factory);
     }
 }
