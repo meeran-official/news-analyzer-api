@@ -1,6 +1,15 @@
 # News Analyzer AI
 
-![News Analyzer AI Demo](./news-analyzer-top.png)
+<table>
+  <tr>
+    <td>
+      <img src="./news-analyzer-top.png" alt="News Analyzer Desktop View - Top" width="100%">
+    </td>
+    <td>
+      <img src="./news-analyzer-bottom.png" alt="News Analyzer Desktop View - Bottom" width="100%">
+    </td>
+  </tr>
+</table>
 
 > **Live Demo:** [news-analyzer](https://news-analyzer-ui.vercel.app/)
 
@@ -53,9 +62,9 @@ News Analyzer AI is a full-stack application designed to move beyond simple news
    news.primary.api.key=<<YOUR_NEWSAPI_KEY>>
    news.primary.api.url=https://newsapi.org/v2/everything
 
-   # --- Secondary News Provider (NewsData.io) ---
+   # --- Secondary News Provider (MediaStack) ---
    news.secondary.api.key=<<YOUR_NEW_NEWSDATA.IO_KEY>>
-   news.secondary.api.url=https://newsdata.io/api/1/news
+   news.secondary.api.url=http://api.mediastack.com/v1/news
 
    # --- Primary LLM Provider (Google Gemini) ---
    llm.primary.provider=Gemini
