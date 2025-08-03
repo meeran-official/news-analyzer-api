@@ -1,6 +1,6 @@
 # News Analyzer AI
 
-<!-- ![Project Demo GIF](URL_TO_YOUR_DEMO_GIF_HERE) -->
+![News Analyzer AI Demo](./news-analyzer-top.png)
 
 > **Live Demo:** [news-analyzer](https://news-analyzer-ui.vercel.app/)
 
