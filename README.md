@@ -45,23 +45,46 @@ News Analyzer AI is a full-stack application designed to move beyond simple news
 2. Navigate to the directory: `cd news-analyzer-api`
 3. Create an `application.properties` file in `src/main/resources/` and add your API keys:
    ```properties
-   news.api.key=<<YOUR_API_KEY>>
+   # --- Spring Boot Configuration ---
+   spring.profiles.active=dev
 
-   # --- Primary LLM Provider (Gemini) ---
+   # All API keys should be replaced with your actual keys. All these providers offers free tier access to their APIs.
+   # --- Primary News Provider (NewsAPI.org) ---
+   news.primary.api.key=<<YOUR_NEWSAPI_KEY>>
+   news.primary.api.url=https://newsapi.org/v2/everything
+
+   # --- Secondary News Provider (NewsData.io) ---
+   news.secondary.api.key=<<YOUR_NEW_NEWSDATA.IO_KEY>>
+   news.secondary.api.url=https://newsdata.io/api/1/news
+
+   # --- Primary LLM Provider (Google Gemini) ---
    llm.primary.provider=Gemini
-   llm.primary.api.key=<<YOUR_API_KEY>>
+   llm.primary.api.key=<<YOUR_GEMINI_API_KEY>>
    llm.primary.api.url=https://generativelanguage.googleapis.com/v1beta/models/
-   llm.primary.model.analysis=gemini-2.5-flash-lite
-   llm.primary.model.suggestions=gemini-2.0-flash-lite
-   llm.primary.model.random=gemini-2.0-flash-lite
+   llm.primary.model.analysis=gemini-2.5-flash
+   llm.primary.model.suggestions=gemini-2.5-flash
+   llm.primary.model.random=gemini-2.5-flash
 
-   # --- Secondary LLM Provider (OpenRouter) ---
-   llm.secondary.provider=OpenRouter
-   llm.secondary.api.key=<<YOUR_API_KEY>>
-   llm.secondary.api.url=https://openrouter.ai/api/v1/chat/completions
-   llm.secondary.model.analysis=moonshotai/kimi-k2:free 
-   llm.secondary.model.suggestions=moonshotai/kimi-k2:free
-   llm.secondary.model.random=moonshotai/kimi-k2:free
+   # --- Secondary LLM Provider (Gemini Lite) ---
+   llm.secondary.provider=Gemini
+   llm.secondary.api.key=<<YOUR_GEMINI_API_KEY>>
+   llm.secondary.api.url=https://generativelanguage.googleapis.com/v1beta/models/
+   llm.secondary.model.analysis=gemini-2.5-flash-lite
+   llm.secondary.model.suggestions=gemini-2.5-flash-lite
+   llm.secondary.model.random=gemini-2.5-flash-lite
+
+   # --- Third LLM Provider (OpenRouter) ---
+   llm.third.provider=OpenRouter
+   llm.third.api.key=<<YOUR_OPENROUTER_API_KEY>>
+   llm.third.api.url=https://openrouter.ai/api/v1/chat/completions
+   llm.third.model.analysis=deepseek/deepseek-chat-v3-0324:free
+   llm.third.model.suggestions=deepseek/deepseek-chat-v3-0324:free
+   llm.third.model.random=deepseek/deepseek-chat-v3-0324:free
+
+   # Alternative OpenRouter models (uncensored model, if the LLM denies due to sensitivity of the topic)
+   # llm.third.model.analysis=cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+   # llm.third.model.suggestions=cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+   # llm.third.model.random=cognitivecomputations/dolphin-mistral-24b-venice-edition:free
    
    # ... other properties (if needed)
 
