@@ -1,8 +1,11 @@
 package com.meeran.newsanalyzerapi.service;
 
-import com.meeran.newsanalyzerapi.dto.Article;
-import com.meeran.newsanalyzerapi.dto.NewsApiResponse;
-import com.meeran.newsanalyzerapi.dto.NewsDataDto;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,11 +15,9 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.meeran.newsanalyzerapi.dto.Article;
+import com.meeran.newsanalyzerapi.dto.MediastackDto;
+import com.meeran.newsanalyzerapi.dto.NewsApiResponse;
 
 @Service
 public class NewsService {
@@ -44,11 +45,11 @@ public class NewsService {
             logger.info("Attempting to fetch articles from primary provider (NewsAPI.org)");
             return fetchFromNewsAPI(topic);
         } catch (HttpClientErrorException.TooManyRequests e) {
-            logger.warn("Primary news provider rate limited. Failing over to secondary provider (NewsData.io).");
-            return fetchFromNewsData(topic);
+            logger.warn("Primary news provider failed. Failing over to secondary provider (Mediastack).", e);
+            return fetchFromMediastack(topic);
         } catch (Exception e) {
             logger.error("Primary news provider failed. Attempting fallback.", e);
-            return fetchFromNewsData(topic);
+            return fetchFromMediastack(topic);
         }
     }
 
@@ -58,38 +59,39 @@ public class NewsService {
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
 
         String url = UriComponentsBuilder.fromHttpUrl(primaryApiUrl)
-            .queryParam("q", topic)
-            .queryParam("from", fromDate.format(formatter))
-            .queryParam("to", toDate.format(formatter))
-            .queryParam("sortBy", "popularity")
-            .queryParam("language", "en")
-            .queryParam("pageSize", 20)
-            .queryParam("apiKey", primaryApiKey)
-            .toUriString();
+                .queryParam("q", topic)
+                .queryParam("from", fromDate.format(formatter))
+                .queryParam("to", toDate.format(formatter))
+                .queryParam("sortBy", "popularity")
+                .queryParam("language", "en")
+                .queryParam("pageSize", 20)
+                .queryParam("apiKey", primaryApiKey)
+                .toUriString();
 
         return restTemplate.getForObject(url, NewsApiResponse.class);
-    }
+    }    
 
-    private NewsApiResponse fetchFromNewsData(String topic) {
+    private NewsApiResponse fetchFromMediastack(String topic) {
         String url = UriComponentsBuilder.fromHttpUrl(secondaryApiUrl)
-            .queryParam("q", topic)
-            .queryParam("language", "en")
-            .queryParam("apikey", secondaryApiKey)
-            .toUriString();
+                .queryParam("access_key", secondaryApiKey)
+                .queryParam("keywords", topic)
+                .queryParam("languages", "en")
+                .queryParam("limit", 20)
+                .toUriString();
+        
+        logger.info("Calling Mediastack with URL: {}", url);
 
         try {
-            NewsDataDto.Response response = restTemplate.getForObject(url, NewsDataDto.Response.class);
-            if (response != null && "success".equals(response.status())) {
-                // Map the NewsData.io DTOs to our application's standard DTOs
-                List<Article> mappedArticles = response.results().stream()
-                    .map(dtoArticle -> new Article(dtoArticle.title(), dtoArticle.description(), dtoArticle.link()))
-                    .collect(Collectors.toList());
-                return new NewsApiResponse("ok", response.totalResults(), mappedArticles);
+            MediastackDto.Response response = restTemplate.getForObject(url, MediastackDto.Response.class);
+            if (response != null && response.data() != null && !response.data().isEmpty()) {
+                List<Article> mappedArticles = response.data().stream()
+                        .map(dtoArticle -> new Article(dtoArticle.title(), dtoArticle.description(), dtoArticle.url()))
+                        .collect(Collectors.toList());
+                return new NewsApiResponse("ok", mappedArticles.size(), mappedArticles);
             }
         } catch (Exception e) {
-            logger.error("Secondary news provider (NewsData.io) also failed.", e);
+            logger.error("Tertiary news provider (Mediastack) also failed.", e);
         }
-        // Return an empty response if all providers fail
         return new NewsApiResponse("error", 0, Collections.emptyList());
     }
 }

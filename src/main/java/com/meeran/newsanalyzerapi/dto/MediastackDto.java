@@ -3,11 +3,11 @@ package com.meeran.newsanalyzerapi.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
-public final class NewsDataDto {
+public final class MediastackDto {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Article(String title, String description, String link) {}
+    public record Article(String title, String description, String url) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Response(String status, int totalResults, List<Article> results) {}
+    public record Response(List<Article> data) {}
 }
